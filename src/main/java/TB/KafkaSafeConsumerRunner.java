@@ -6,11 +6,12 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 
 import java.util.Properties;
 
-public class KafkaSafeConsumerRunner
-{
-    private final String TOPIC_NAME = "tb";
+public class KafkaSafeConsumerRunner {
+    private static final String TOPIC_NAME = "tb";
     public static void main( String[] args ) {
         KafkaConsumer consumer = new KafkaConsumer(getProperties(), new StringDeserializer(), new JsonDeserializer(Car.class));
+        Thread kafka = new Thread(new KafkaSafeConsumerRunnable(TOPIC_NAME, consumer, new OffsetRepository(), new EventRepo()));
+        kafka.start();
     }
 
     private static Properties getProperties() {
