@@ -5,6 +5,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.WakeupException;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -35,9 +36,22 @@ public class KafkaSafeConsumerRunnable implements Runnable {
                 consumer.subscribe(Collections.singleton(topicName), rebalanceListener);
                 seekToSpecificOffset();
                 processRecords();
-            } finally {
-                consumer.commitSync(offsetRepository.getPartitionOffsetMap());
+            } catch (IllegalStateException | WakeupException | InterruptedException e) {
+                log.error("consumer already revoked -- closed");
+                closed.set(true);
                 consumer.close();
+            }
+            finally {
+                try {
+                    consumer.commitSync(offsetRepository.getPartitionOffsetMap(consumer));
+                    consumer.close();
+                } catch (IllegalStateException | WakeupException e) {
+                    log.error("consumer already revoked -- closed");
+                    closed.set(true);
+                    consumer.close();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
     }
@@ -46,7 +60,12 @@ public class KafkaSafeConsumerRunnable implements Runnable {
     private void seekToSpecificOffset() {
         consumer.assignment().forEach(partition -> {
             TopicPartition topicPartition = (TopicPartition) partition;
-            Optional<Long> offset = offsetRepository.getOffset(topicPartition);
+            Optional<Long> offset = null;
+            try {
+                offset = offsetRepository.getOffset(topicPartition);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
             if(offset.isPresent()) {
                 long nextOffset = offset.get() + 1;
                 log.info("consumer seeking to ");
@@ -55,7 +74,7 @@ public class KafkaSafeConsumerRunnable implements Runnable {
         });
     }
 
-    private void processRecords() {
+    private void processRecords() throws InterruptedException {
         if(!closed.get()) {
             ConsumerRecords<String, Car> consumerRecords = consumer.poll(Duration.ofMillis(1000));
             for (ConsumerRecord<String, Car> consumerRecord : consumerRecords) {
@@ -64,13 +83,13 @@ public class KafkaSafeConsumerRunnable implements Runnable {
         }
     }
 
-    private void processSingleEvent(ConsumerRecord<String, Car> consumerRecord) {
+    private void processSingleEvent(ConsumerRecord<String, Car> consumerRecord) throws InterruptedException {
         //check for possible duplicate of message by unique attribute
         if(!eventRepo.isEventProcessed(consumerRecord.value().getVin())) {
             log.info("processing partition: {} with value {} offset {}", consumerRecord.partition(), consumerRecord.value(), consumerRecord.offset());
             eventRepo.saveEventId(consumerRecord.value().getVin());
             offsetRepository.storeOffset(consumerRecord);
-            consumer.commitAsync(offsetRepository.getPartitionOffsetMap(), new OffsetCommitCallback());
+            consumer.commitAsync(offsetRepository.getPartitionOffsetMap(consumer), new OffsetCommitCallback());
         }
     }
 
