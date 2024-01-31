@@ -1,27 +1,27 @@
 package TB;
 
+import TB.callbacks.OffsetCommitCallback;
+import TB.model.Car;
+import com.hazelcast.partition.Partition;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 
 import java.time.Duration;
-import java.util.Collections;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 public class KafkaSafeConsumerRunnable implements Runnable {
 
     private final String topicName;
-    private final KafkaConsumer consumer;
+    private final KafkaConsumer<String, Car> consumer;
     private final OffsetRepository offsetRepository;
     private final EventRepo eventRepo;
     private AtomicBoolean closed = new AtomicBoolean(false);
 
-    public KafkaSafeConsumerRunnable(String topicName, KafkaConsumer consumer, OffsetRepository offsetRepository, EventRepo eventRepo) {
+    public KafkaSafeConsumerRunnable(String topicName, KafkaConsumer<String, Car> consumer, OffsetRepository offsetRepository, EventRepo eventRepo) {
         this.topicName = topicName;
         this.consumer = consumer;
         this.offsetRepository = offsetRepository;
@@ -36,21 +36,21 @@ public class KafkaSafeConsumerRunnable implements Runnable {
                 consumer.subscribe(Collections.singleton(topicName), rebalanceListener);
                 seekToSpecificOffset();
                 processRecords();
-            } catch (IllegalStateException | WakeupException | InterruptedException e) {
-                log.error("consumer already revoked -- closed");
-                closed.set(true);
-                consumer.close();
-            }
-            finally {
+            } catch (WakeupException | InterruptedException e) {
+                // Ignore exception if closing
+                if (!closed.get())
+                    try {
+                        throw e;
+                    } catch (InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
+            } finally {
                 try {
-                    consumer.commitSync(offsetRepository.getPartitionOffsetMap(consumer));
+                    commitSyncForClosingConsumer(consumer.assignment());
+                } catch (CommitFailedException e) {
+                    log.error("Synchronous commit offset failed", e);
+                } finally {
                     consumer.close();
-                } catch (IllegalStateException | WakeupException e) {
-                    log.error("consumer already revoked -- closed");
-                    closed.set(true);
-                    consumer.close();
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
                 }
             }
         }
@@ -91,6 +91,23 @@ public class KafkaSafeConsumerRunnable implements Runnable {
             offsetRepository.storeOffset(consumerRecord);
             consumer.commitAsync(offsetRepository.getPartitionOffsetMap(consumer), new OffsetCommitCallback());
         }
+    }
+
+    private void commitSyncForClosingConsumer(Collection<TopicPartition> partitions) {
+        Map<TopicPartition, OffsetAndMetadata> topicPartitionOffsetAndMetadataMap = new HashMap<>();
+
+            partitions.forEach(partition -> {
+            TopicPartition topicPartition = new TopicPartition(partition.topic(), partition.partition());
+            Long offset = null;
+            try {
+                offset = offsetRepository.getOffset(topicPartition).orElseThrow(() ->
+                        new IllegalStateException(String.format("No cached offset for given TopicPartition %s", topicPartition)));
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            topicPartitionOffsetAndMetadataMap.put(topicPartition, new OffsetAndMetadata(offset));
+        });
+            consumer.commitSync(topicPartitionOffsetAndMetadataMap);
     }
 
     public void shutdown() {

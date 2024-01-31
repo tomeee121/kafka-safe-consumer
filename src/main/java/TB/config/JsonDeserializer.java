@@ -1,4 +1,4 @@
-package TB;
+package TB.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.serialization.Deserializer;

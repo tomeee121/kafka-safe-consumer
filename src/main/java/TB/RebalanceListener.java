@@ -1,5 +1,6 @@
 package TB;
 
+import TB.config.HazelcastConfugration;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -9,6 +10,7 @@ import org.apache.kafka.common.TopicPartition;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 public class RebalanceListener implements ConsumerRebalanceListener {
@@ -41,6 +43,10 @@ public class RebalanceListener implements ConsumerRebalanceListener {
             topicPartitionOffsetAndMetadataMap.put(topicPartition, new OffsetAndMetadata(offset));
         });
         consumer.commitSync(topicPartitionOffsetAndMetadataMap);
+
+        partitions.forEach(partition -> {
+            HazelcastConfugration.clearBuffeerCache(partition.topic() + "_" + partition.partition());
+        });
     }
 
     @Override
@@ -48,8 +54,17 @@ public class RebalanceListener implements ConsumerRebalanceListener {
         log.info("partitions assigned: ");
         partitions.forEach(partition -> log.info("{}, ", partition.partition()));
 
+        //start reading from stored offset
         partitions.forEach(partition -> {
-            HazelcastConfugration.addBufferCache(partition.topic() + "_" + partition.partition());
+            Optional<Long> offset = null;
+            try {
+                offset = offsetRepository.getOffset(partition);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            if (offset.isPresent()) {
+                consumer.seek(partition, offset.get().longValue());
+            }
         });
     }
 }

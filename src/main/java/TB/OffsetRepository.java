@@ -1,8 +1,8 @@
 package TB;
 
+import TB.config.HazelcastConfugration;
+import TB.model.Car;
 import com.hazelcast.ringbuffer.Ringbuffer;
-import org.apache.commons.collections.Buffer;
-import org.apache.commons.collections.buffer.CircularFifoBuffer;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
