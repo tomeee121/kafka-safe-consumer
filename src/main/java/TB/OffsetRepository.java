@@ -17,6 +17,9 @@ public class OffsetRepository {
     public Optional<Long> getOffset(TopicPartition partition) throws InterruptedException {
         Ringbuffer<Long> ringbuffer = HazelcastConfugration.getSpecificRingBufferCache(partition.topic() + "_" + partition.partition());
         long sequence = ringbuffer.tailSequence();
+        if(sequence < 0) {
+            return Optional.ofNullable(0L);
+        }
         Long item = ringbuffer.readOne(sequence);
         return Optional.ofNullable(item);
     }
@@ -34,7 +37,11 @@ public class OffsetRepository {
             long sequence = ringbuffer.tailSequence();
             Long item = null;
             try {
-                item = ringbuffer.readOne(sequence);
+                if(sequence < 0) {
+                    item = 0L;
+                } else {
+                    item = ringbuffer.readOne(sequence);
+                }
 
                 metadataMap.put(new TopicPartition(((TopicPartition) partition).topic(), ((TopicPartition) partition).partition()),
                         new OffsetAndMetadata(item));

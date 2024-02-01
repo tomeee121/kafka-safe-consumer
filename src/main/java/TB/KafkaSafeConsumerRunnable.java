@@ -1,6 +1,7 @@
 package TB;
 
 import TB.callbacks.OffsetCommitCallback;
+import TB.config.HazelcastConfugration;
 import TB.model.Car;
 import com.hazelcast.partition.Partition;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +35,8 @@ public class KafkaSafeConsumerRunnable implements Runnable {
         while (!closed.get()) {
             try {
                 consumer.subscribe(Collections.singleton(topicName), rebalanceListener);
-                seekToSpecificOffset();
+//                redundand for now (rebalance listener implemented)
+//                seekToSpecificOffset();
                 processRecords();
             } catch (WakeupException | InterruptedException e) {
                 // Ignore exception if closing
@@ -50,7 +52,7 @@ public class KafkaSafeConsumerRunnable implements Runnable {
                 } catch (CommitFailedException e) {
                     log.error("Synchronous commit offset failed", e);
                 } finally {
-                    consumer.close();
+//                    consumer.close();
                 }
             }
         }
@@ -67,6 +69,13 @@ public class KafkaSafeConsumerRunnable implements Runnable {
                 throw new RuntimeException(e);
             }
             if(offset.isPresent()) {
+
+                //in case first read message is yet to come
+                if(offset.get() == 0L) {
+                    consumer.seek(topicPartition, 0L);
+                    return;
+                }
+
                 long nextOffset = offset.get() + 1;
                 log.info("consumer seeking to ");
                 consumer.seek(topicPartition, nextOffset);
@@ -76,17 +85,25 @@ public class KafkaSafeConsumerRunnable implements Runnable {
 
     private void processRecords() throws InterruptedException {
         if(!closed.get()) {
-            ConsumerRecords<String, Car> consumerRecords = consumer.poll(Duration.ofMillis(1000));
-            for (ConsumerRecord<String, Car> consumerRecord : consumerRecords) {
-                processSingleEvent(consumerRecord);
-            }
+            ConsumerRecords<String, Car> consumerRecords = consumer.poll(Duration.ofMillis(10000));
+            consumerRecords.partitions().iterator().forEachRemaining(topicPartition -> {
+                HazelcastConfugration.addSpecificRingBufferCache(topicPartition);
+
+                consumerRecords.records(topicPartition).forEach(record -> {
+                    try {
+                        processSingleEvent(record);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+            });
         }
     }
 
     private void processSingleEvent(ConsumerRecord<String, Car> consumerRecord) throws InterruptedException {
         //check for possible duplicate of message by unique attribute
         if(!eventRepo.isEventProcessed(consumerRecord.value().getVin())) {
-            log.info("processing partition: {} with value {} offset {}", consumerRecord.partition(), consumerRecord.value(), consumerRecord.offset());
+            log.debug("processing partition: {} with value {} offset {}", consumerRecord.partition(), consumerRecord.value(), consumerRecord.offset());
             eventRepo.saveEventId(consumerRecord.value().getVin());
             offsetRepository.storeOffset(consumerRecord);
             consumer.commitAsync(offsetRepository.getPartitionOffsetMap(consumer), new OffsetCommitCallback());

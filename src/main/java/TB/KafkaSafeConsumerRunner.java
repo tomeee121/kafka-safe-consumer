@@ -1,5 +1,6 @@
 package TB;
 
+import TB.listeners.ReadEventProcessedRunnable;
 import TB.config.HazelcastConfugration;
 import TB.config.JsonDeserializer;
 import TB.config.KafkaJsonSerializer;
@@ -18,11 +19,15 @@ import java.util.UUID;
 public class KafkaSafeConsumerRunner {
     private static final String TOPIC_NAME = "tb";
     public static void main( String[] args ) throws InterruptedException {
-        HazelcastConfugration.addIdCache();
+        HazelcastConfugration.addIListForEventIdCache();
 
+        EventRepo eventRepo = new EventRepo();
         KafkaConsumer<String, Car> consumer = new KafkaConsumer<String, Car>(getProperties(), new StringDeserializer(), new JsonDeserializer(Car.class));
-        Thread kafka = new Thread(new KafkaSafeConsumerRunnable(TOPIC_NAME, consumer, new OffsetRepository(), new EventRepo()));
+        Thread kafka = new Thread(new KafkaSafeConsumerRunnable(TOPIC_NAME, consumer, new OffsetRepository(), eventRepo));
         kafka.start();
+
+        Thread readEventProcessedRunnable = new Thread(new ReadEventProcessedRunnable(eventRepo));
+        readEventProcessedRunnable.start();
 
         publishRecords();
     }
@@ -56,9 +61,14 @@ public class KafkaSafeConsumerRunner {
         // 2. create producer
         KafkaProducer<String, Car> producer = new KafkaProducer<String, Car>(kafkaProps);
 
+        //wait for Hazelcast startup
+        Thread.sleep(7000);
         for (int i = 0; i < 200; i++) {
-            Thread.sleep(1000);
-            ProducerRecord<String, Car> record = new ProducerRecord<>(TOPIC_NAME, "key", new Car("brand: " + i, "model: " + i, UUID.randomUUID()));
+            System.out.println("published within loop: " + i);
+            String uuidWithOrderMetadata = UUID.randomUUID().toString().replaceFirst("^[a-zA-Z0-9]{3}", String.format("%03d", i));
+            UUID uuidWithInfoAboutOrderForDebugging = UUID.fromString(uuidWithOrderMetadata);
+            ProducerRecord<String, Car> record =
+                    new ProducerRecord<>(TOPIC_NAME, "key", new Car("brand: " + i, "model: " + i, uuidWithInfoAboutOrderForDebugging));
 
             // 4. send data by fire and forget method
             producer.send(record);

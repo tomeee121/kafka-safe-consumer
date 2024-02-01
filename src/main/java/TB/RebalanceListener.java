@@ -63,7 +63,14 @@ public class RebalanceListener implements ConsumerRebalanceListener {
                 throw new RuntimeException(e);
             }
             if (offset.isPresent()) {
-                consumer.seek(partition, offset.get().longValue());
+                //in case first read message is yet to come
+                if (offset.get() == 0L) {
+                    consumer.seek(partition, 0L);
+                } else {
+                    long nextOffset = offset.get() + 1;
+                    log.info("consumer seeking to ");
+                    consumer.seek(partition, nextOffset);
+                }
             }
         });
     }
