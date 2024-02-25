@@ -70,7 +70,7 @@ public class Startup {
         Thread.sleep(7000);
         for (int i = 0; i < 400; i++) {
             Thread.sleep(100);
-//            System.out.println("published within loop: " + i);
+            System.out.println("published within loop: " + i);
             TB.model.UUID uuidAbleToRecap = new TB.model.UUID(Long.valueOf(String.format("%03d", i)));
             ProducerRecord<String, Car> record =
                     new ProducerRecord<>(TOPIC_NAME, "key", new Car("brand: " + i, "model: " + i, uuidAbleToRecap));

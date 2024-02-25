@@ -50,7 +50,7 @@ public class RebalanceListener implements ConsumerRebalanceListener {
             }
             topicPartitionOffsetAndMetadataMap.put(topicPartition, new OffsetAndMetadata(offset));
         });
-//        consumer.commitSync(topicPartitionOffsetAndMetadataMap);
+        consumer.commitSync(topicPartitionOffsetAndMetadataMap);
 
         partitions.forEach(partition -> {
             hazelcastConfiguration.clearBuffeerCache(partition.topic() + "_" + partition.partition());
@@ -88,8 +88,8 @@ public class RebalanceListener implements ConsumerRebalanceListener {
                     consumer.seek(partition, 0L);
                 } else {
                     long nextOffset = offset.get() + 1;
-                    log.info("consumer seeking to ");
-//                    consumer.seek(partition, nextOffset);
+                    log.info("consumer seeking to offset {}", nextOffset);
+                    consumer.seek(partition, nextOffset);
                 }
             }
         });

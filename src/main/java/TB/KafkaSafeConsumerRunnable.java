@@ -66,7 +66,7 @@ public class KafkaSafeConsumerRunnable implements Runnable {
             }
             finally {
                 try {
-//                    commitSyncForClosingConsumer(consumer.assignment());
+                    commitSyncForClosingConsumer(consumer.assignment());
                 } catch (CommitFailedException e) {
                     log.error("Synchronous commit offset failed", e);
                     consumer.close();
@@ -124,7 +124,7 @@ public class KafkaSafeConsumerRunnable implements Runnable {
             log.debug("processing partition: {} with value {} offset {}", consumerRecord.partition(), consumerRecord.value(), consumerRecord.offset());
             eventRepo.saveEventId(consumerRecord.value().getVin());
             offsetRepository.storeOffset(consumerRecord);
-//            consumer.commitAsync(offsetRepository.getPartitionOffsetMap(consumer), new OffsetCommitCallback());
+            consumer.commitAsync(offsetRepository.getPartitionOffsetMap(consumer), new OffsetCommitCallback());
         }
     }
 
@@ -142,7 +142,7 @@ public class KafkaSafeConsumerRunnable implements Runnable {
             }
             topicPartitionOffsetAndMetadataMap.put(topicPartition, new OffsetAndMetadata(offset));
         });
-//            consumer.commitSync(topicPartitionOffsetAndMetadataMap);
+            consumer.commitSync(topicPartitionOffsetAndMetadataMap);
     }
 
     public void shutdown() {
