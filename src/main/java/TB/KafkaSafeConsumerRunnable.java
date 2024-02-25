@@ -1,5 +1,6 @@
 package TB;
 
+import TB.callbacks.OffsetCommitCallback;
 import TB.config.HazelcastConfiguration;
 import TB.model.Car;
 import lombok.extern.slf4j.Slf4j;
@@ -65,7 +66,7 @@ public class KafkaSafeConsumerRunnable implements Runnable {
             }
             finally {
                 try {
-                    commitSyncForClosingConsumer(consumer.assignment());
+//                    commitSyncForClosingConsumer(consumer.assignment());
                 } catch (CommitFailedException e) {
                     log.error("Synchronous commit offset failed", e);
                     consumer.close();
@@ -119,6 +120,7 @@ public class KafkaSafeConsumerRunnable implements Runnable {
     private void processSingleEvent(ConsumerRecord<String, Car> consumerRecord) throws InterruptedException {
         //check for possible duplicate of message by unique attribute
         if(!eventRepo.isEventProcessed(consumerRecord.value().getVin())) {
+            log.info("Processed vin: " + consumerRecord.value().getVin());
             log.debug("processing partition: {} with value {} offset {}", consumerRecord.partition(), consumerRecord.value(), consumerRecord.offset());
             eventRepo.saveEventId(consumerRecord.value().getVin());
             offsetRepository.storeOffset(consumerRecord);

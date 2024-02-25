@@ -9,11 +9,11 @@ public class HZIListItemListener implements ItemListener<Long> {
 
     @Override
     public void itemAdded(ItemEvent<Long> event) {
-        System.out.println( "Item added:  " + event );
+//        System.out.println( "Item added:  " + event );
     }
 
     @Override
     public void itemRemoved(ItemEvent<Long> event) {
-        System.out.println( "Item removed: " + event );
+//        System.out.println( "Item removed: " + event );
     }
 }

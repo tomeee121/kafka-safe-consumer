@@ -14,11 +14,12 @@ public class EventRepo {
     }
 
     public boolean isEventProcessed(TB.model.UUID eventId) {
-        return hazelcastConfiguration.getEventIdCache().contains(eventId.getUuid());
+//        return hazelcastConfiguration.getEventIdCache().contains(eventId.getUuid());
+        return false;
     }
 
     public void saveEventId(TB.model.UUID eventId) {
-        hazelcastConfiguration.addEventIdToListCache(eventId);
+//        hazelcastConfiguration.addEventIdToListCache(eventId);
     }
 
     public IList<Long> getSavedEventIdList() {

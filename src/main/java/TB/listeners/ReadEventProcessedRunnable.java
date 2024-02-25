@@ -19,10 +19,10 @@ public class ReadEventProcessedRunnable implements Runnable {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            log.info("INFO. Processed event ids of size {}:", eventRepo.getSavedEventIdList().size());
+//            log.info("INFO. Processed event ids of size {}:", eventRepo.getSavedEventIdList().size());
             for (int i1 = 0; i1 < eventRepo.getSavedEventIdList().size(); i1++) {
                 if(i1 % 10 == 0) {
-                    System.out.println(eventRepo.getSavedEventIdList().get(i1));
+//                    System.out.println(eventRepo.getSavedEventIdList().get(i1));
                 }
             }
 //            eventRepo.getSavedEventIdList().listIterator().forEachRemaining(System.out::println);

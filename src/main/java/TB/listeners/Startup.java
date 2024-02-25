@@ -14,13 +14,10 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.springframework.boot.context.event.ApplicationContextInitializedEvent;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.ContextStartedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.PostConstruct;
 import java.util.Properties;
 
 @Component
@@ -55,6 +52,8 @@ public class Startup {
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         properties.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "8000");
         properties.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, "3000");
+        properties.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, "90000");
+        properties.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, "3000");
         return properties;
     }
 
@@ -71,7 +70,7 @@ public class Startup {
         Thread.sleep(7000);
         for (int i = 0; i < 400; i++) {
             Thread.sleep(100);
-            System.out.println("published within loop: " + i);
+//            System.out.println("published within loop: " + i);
             TB.model.UUID uuidAbleToRecap = new TB.model.UUID(Long.valueOf(String.format("%03d", i)));
             ProducerRecord<String, Car> record =
                     new ProducerRecord<>(TOPIC_NAME, "key", new Car("brand: " + i, "model: " + i, uuidAbleToRecap));

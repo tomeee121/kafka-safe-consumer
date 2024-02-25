@@ -89,7 +89,7 @@ public class RebalanceListener implements ConsumerRebalanceListener {
                 } else {
                     long nextOffset = offset.get() + 1;
                     log.info("consumer seeking to ");
-                    consumer.seek(partition, nextOffset);
+//                    consumer.seek(partition, nextOffset);
                 }
             }
         });
