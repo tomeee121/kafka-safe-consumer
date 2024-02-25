@@ -20,7 +20,8 @@ Now, after all the ids have been processed by the consumer and saved to the Haze
 * So the offset gets set by saving it in distributed Hazelcast cache and used on invocation of method:
 onPartitionsAssigned(Collection<TopicPartition> partitions)
 * After restart of an app in a minute:
-![obraz](https://github.com/tomeee121/kafka-safe-consumer/assets/85828070/b20929ad-7c27-4d95-9225-563c2dc9a45d)
+
+  ![obraz](https://github.com/tomeee121/kafka-safe-consumer/assets/85828070/4bf5c152-57af-4e7d-aab3-4aa82fea7005)
 
 * fun fact: even after overriding Kafka rebalance listener in onPartitionsAssigned(Collection<TopicPartition> partitions) method and commenting seek() method out, which is setting offset for a TopicPartition (trying to destroy app a little bit:)) the Kafka consumer's group coordinator comes into place to do the job and save the situation (prevent reading same data over and over). So as long as we keep committing often enough, there is no need to worry about rebalancing
   ![obraz](https://github.com/tomeee121/kafka-safe-consumer/assets/85828070/6c78b748-ef58-43b9-a978-bb780aee83e0)
