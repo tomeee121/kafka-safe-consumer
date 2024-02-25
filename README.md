@@ -19,6 +19,6 @@ Now, after all the ids have been processed by the consumer and saved to the Haze
 * To check what offset Kafka is on, easy way we can start app second time and read the logs, or just edit IJ configuration and start next isntance of an app while -- trigger it manually.
 * So without commiting offset while polling/rebalancing Kafka broker does not store cached info about what was already read and what not (offset) -- per topic and partition
 * After restart of an app in a minute:
- ![obraz](https://github.com/tomeee121/kafka-safe-consumer/assets/85828070/87a0a6d8-3c12-4e50-a600-e99a84400548)
+![obraz](https://github.com/tomeee121/kafka-safe-consumer/assets/85828070/f098839b-8b3b-4d48-854d-5fa35cdb51b3)
 
   
