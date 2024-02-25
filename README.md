@@ -17,8 +17,13 @@ Now, after all the ids have been processed by the consumer and saved to the Haze
 * Now let's test how Kafka offset controlling mechanisms work. First step is to disable "auto.commit" property of producer and mock Hazelcast cache to let app process same messages over and over again. Plus I cleared some logs not connected with this lab and set consumer's props for "fetch.min.bytes/fetchmax.wait.ms.config" for the same purpose (every invocation of poll() method leaves some logs bluring it a little bit)
 * Offset can be controlled manually by sync/async committing while method poll() fetching Kafka records occurs or by listening to rebalnce happening (method onPartitionsRevoked()).
 * To check what offset Kafka is on, easy way we can start app second time and read the logs, or just edit IJ configuration and start next isntance of an app while -- trigger it manually.
-* So without commiting offset while polling/rebalancing Kafka broker does not store cached info about what was already read and what not (offset) -- per topic and partition
+* So the offset gets set by saving it in distributed Hazelcast cache and used on invocation of method:
+onPartitionsAssigned(Collection<TopicPartition> partitions)
 * After restart of an app in a minute:
-![obraz](https://github.com/tomeee121/kafka-safe-consumer/assets/85828070/f098839b-8b3b-4d48-854d-5fa35cdb51b3)
+![obraz](https://github.com/tomeee121/kafka-safe-consumer/assets/85828070/b20929ad-7c27-4d95-9225-563c2dc9a45d)
+
+* fun fact: even after overriding Kafka rebalance listener in onPartitionsAssigned(Collection<TopicPartition> partitions) method and commenting seek() method out, which is setting offset for a TopicPartition (trying to destroy app a little bit:)) the Kafka consumer's group coordinator comes into place to do the job and save the situation (prevent reading same data over and over). So as long as we keep committing often enough, there is no need to worry about rebalancing
+  ![obraz](https://github.com/tomeee121/kafka-safe-consumer/assets/85828070/6c78b748-ef58-43b9-a978-bb780aee83e0)
+
 
   
