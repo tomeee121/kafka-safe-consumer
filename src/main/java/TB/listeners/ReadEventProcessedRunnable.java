@@ -1,7 +1,9 @@
 package TB.listeners;
 
 import TB.EventRepo;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class ReadEventProcessedRunnable implements Runnable {
     private final EventRepo eventRepo;
 
@@ -17,8 +19,13 @@ public class ReadEventProcessedRunnable implements Runnable {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            System.out.println(String.format("INFO. Processed event ids:"));
-            eventRepo.getSavedEventIdList().listIterator().forEachRemaining(System.out::println);
+            log.info("INFO. Processed event ids of size {}:", eventRepo.getSavedEventIdList().size());
+            for (int i1 = 0; i1 < eventRepo.getSavedEventIdList().size(); i1++) {
+                if(i1 % 10 == 0) {
+                    System.out.println(eventRepo.getSavedEventIdList().get(i1));
+                }
+            }
+//            eventRepo.getSavedEventIdList().listIterator().forEachRemaining(System.out::println);
         }
     }
 }

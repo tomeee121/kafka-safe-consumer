@@ -1,21 +1,27 @@
 package TB;
 
-import TB.config.HazelcastConfugration;
+import TB.config.HazelcastConfiguration;
 import com.hazelcast.collection.IList;
+import org.springframework.stereotype.Component;
 
-import java.util.UUID;
-
+@Component
 public class EventRepo {
 
-    public boolean isEventProcessed(UUID eventId) {
-        return HazelcastConfugration.getEventIdCache().contains(eventId);
+    private final HazelcastConfiguration hazelcastConfiguration;
+
+    public EventRepo(HazelcastConfiguration hazelcastConfiguration) {
+        this.hazelcastConfiguration = hazelcastConfiguration;
     }
 
-    public void saveEventId(UUID eventId) {
-        HazelcastConfugration.addEventIdToListCache(eventId);
+    public boolean isEventProcessed(TB.model.UUID eventId) {
+        return hazelcastConfiguration.getEventIdCache().contains(eventId.getUuid());
     }
 
-    public IList<UUID> getSavedEventIdList() {
-        return HazelcastConfugration.getEventIdCache();
+    public void saveEventId(TB.model.UUID eventId) {
+        hazelcastConfiguration.addEventIdToListCache(eventId);
+    }
+
+    public IList<Long> getSavedEventIdList() {
+        return hazelcastConfiguration.getEventIdCache();
     }
 }

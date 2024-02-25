@@ -1,64 +1,80 @@
 package TB;
 
-import TB.callbacks.OffsetCommitCallback;
-import TB.config.HazelcastConfugration;
+import TB.config.HazelcastConfiguration;
 import TB.model.Car;
-import com.hazelcast.partition.Partition;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
+@Component
 public class KafkaSafeConsumerRunnable implements Runnable {
-
-    private final String topicName;
-    private final KafkaConsumer<String, Car> consumer;
+    private static final String topicName = "tb";
+    private KafkaConsumer<String, Car> consumer;
     private final OffsetRepository offsetRepository;
     private final EventRepo eventRepo;
     private AtomicBoolean closed = new AtomicBoolean(false);
+    private final HazelcastConfiguration hazelcastConfiguration;
 
-    public KafkaSafeConsumerRunnable(String topicName, KafkaConsumer<String, Car> consumer, OffsetRepository offsetRepository, EventRepo eventRepo) {
-        this.topicName = topicName;
-        this.consumer = consumer;
+    public KafkaSafeConsumerRunnable(OffsetRepository offsetRepository, EventRepo eventRepo, HazelcastConfiguration hazelcastConfiguration) {
         this.offsetRepository = offsetRepository;
         this.eventRepo = eventRepo;
+        this.hazelcastConfiguration = hazelcastConfiguration;
+    }
+
+    public void setConsumer(KafkaConsumer<String, Car> consumer) {
+        this.consumer = consumer;
     }
 
     @Override
     public void run() {
-        RebalanceListener rebalanceListener = new RebalanceListener(consumer, offsetRepository);
+        RebalanceListener rebalanceListener = new RebalanceListener(offsetRepository, hazelcastConfiguration);
+        rebalanceListener.setConsumer(consumer);
         while (!closed.get()) {
             try {
                 consumer.subscribe(Collections.singleton(topicName), rebalanceListener);
 //                redundand for now (rebalance listener implemented)
 //                seekToSpecificOffset();
                 processRecords();
-            } catch (WakeupException | InterruptedException e) {
+            } catch (WakeupException e) {
                 // Ignore exception if closing
-                if (!closed.get())
+                if (!closed.get()) {
                     try {
                         throw e;
-                    } catch (InterruptedException ex) {
+                    } catch (WakeupException ex) {
+                        consumer.close();
                         throw new RuntimeException(ex);
                     }
-            } finally {
+                }
+            } catch (InterruptedException e) {
+                if (!closed.get()) {
+                    try {
+                    throw e;
+                } catch (InterruptedException ex) {
+                        consumer.close();
+                        throw new RuntimeException(ex);
+                }
+            }
+            }
+            finally {
                 try {
                     commitSyncForClosingConsumer(consumer.assignment());
                 } catch (CommitFailedException e) {
                     log.error("Synchronous commit offset failed", e);
-                } finally {
-//                    consumer.close();
+                    consumer.close();
                 }
             }
         }
     }
 
-    //use state in rebalance listener to be up-to-date in case rebalancing happened in the middle of poll() records processing
+    //alternative to rebalance listener impl for taking care of offset
     private void seekToSpecificOffset() {
         consumer.assignment().forEach(partition -> {
             TopicPartition topicPartition = (TopicPartition) partition;
@@ -87,7 +103,7 @@ public class KafkaSafeConsumerRunnable implements Runnable {
         if(!closed.get()) {
             ConsumerRecords<String, Car> consumerRecords = consumer.poll(Duration.ofMillis(10000));
             consumerRecords.partitions().iterator().forEachRemaining(topicPartition -> {
-                HazelcastConfugration.addSpecificRingBufferCache(topicPartition);
+                hazelcastConfiguration.addSpecificRingBufferCache(topicPartition);
 
                 consumerRecords.records(topicPartition).forEach(record -> {
                     try {
@@ -106,7 +122,7 @@ public class KafkaSafeConsumerRunnable implements Runnable {
             log.debug("processing partition: {} with value {} offset {}", consumerRecord.partition(), consumerRecord.value(), consumerRecord.offset());
             eventRepo.saveEventId(consumerRecord.value().getVin());
             offsetRepository.storeOffset(consumerRecord);
-            consumer.commitAsync(offsetRepository.getPartitionOffsetMap(consumer), new OffsetCommitCallback());
+//            consumer.commitAsync(offsetRepository.getPartitionOffsetMap(consumer), new OffsetCommitCallback());
         }
     }
 
@@ -124,7 +140,7 @@ public class KafkaSafeConsumerRunnable implements Runnable {
             }
             topicPartitionOffsetAndMetadataMap.put(topicPartition, new OffsetAndMetadata(offset));
         });
-            consumer.commitSync(topicPartitionOffsetAndMetadataMap);
+//            consumer.commitSync(topicPartitionOffsetAndMetadataMap);
     }
 
     public void shutdown() {

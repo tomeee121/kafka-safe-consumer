@@ -1,11 +1,12 @@
 package TB;
 
-import TB.config.HazelcastConfugration;
+import TB.config.HazelcastConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
+import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -13,14 +14,21 @@ import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
+@Component
 public class RebalanceListener implements ConsumerRebalanceListener {
 
     private KafkaConsumer consumer;
     private OffsetRepository offsetRepository;
+    private final HazelcastConfiguration hazelcastConfiguration;
+    private int i = 0;
 
-    public RebalanceListener(KafkaConsumer consumer, OffsetRepository offsetRepository) {
-        this.consumer = consumer;
+    public RebalanceListener(OffsetRepository offsetRepository, HazelcastConfiguration hazelcastConfiguration) {
         this.offsetRepository = offsetRepository;
+        this.hazelcastConfiguration = hazelcastConfiguration;
+    }
+
+    public void setConsumer(KafkaConsumer consumer) {
+        this.consumer = consumer;
     }
 
     @Override
@@ -42,10 +50,10 @@ public class RebalanceListener implements ConsumerRebalanceListener {
             }
             topicPartitionOffsetAndMetadataMap.put(topicPartition, new OffsetAndMetadata(offset));
         });
-        consumer.commitSync(topicPartitionOffsetAndMetadataMap);
+//        consumer.commitSync(topicPartitionOffsetAndMetadataMap);
 
         partitions.forEach(partition -> {
-            HazelcastConfugration.clearBuffeerCache(partition.topic() + "_" + partition.partition());
+            hazelcastConfiguration.clearBuffeerCache(partition.topic() + "_" + partition.partition());
         });
     }
 
@@ -53,6 +61,18 @@ public class RebalanceListener implements ConsumerRebalanceListener {
     public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
         log.info("partitions assigned: ");
         partitions.forEach(partition -> log.info("{}, ", partition.partition()));
+
+        i++;
+        //produce second sort of messages after second partitions assignment-> one broker must be down to trigger it
+        if(i == 2) {
+            KafkaSafeConsumerRunner kafkaSafeConsumerRunner = new KafkaSafeConsumerRunner();
+            try {
+                kafkaSafeConsumerRunner.publishRecordsAfterRebalanceOfDeadBroker();
+            } catch (InterruptedException e) {
+                log.error("Error during producing second sort of messages!");
+                throw new RuntimeException(e);
+            }
+        }
 
         //start reading from stored offset
         partitions.forEach(partition -> {

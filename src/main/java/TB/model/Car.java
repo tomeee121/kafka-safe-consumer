@@ -10,9 +10,9 @@ public class Car {
 
     private String brand;
     private String model;
-    private UUID vin;
+    private TB.model.UUID vin;
 
-    public Car(@JsonProperty("brand") String brand, @JsonProperty("model") String model, @JsonProperty("vin") UUID vin) {
+    public Car(@JsonProperty("brand") String brand, @JsonProperty("model") String model, @JsonProperty("vin") TB.model.UUID vin) {
         this.brand = brand;
         this.model = model;
         this.vin = vin;

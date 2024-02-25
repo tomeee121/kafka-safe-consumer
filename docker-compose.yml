@@ -2,8 +2,12 @@ version: "3.8"
 services:
   hazelcast:
     image: hazelcast/hazelcast:5.3.4-SNAPSHOT
+    environment:
+      - HZ_NETWORK_PUBLICADDRESS=127.0.0.1:5701
+      - HZ_INSTANCENAME=kafka
+      - HZ_CLUSTERNAME=dev
     ports:
-      - "5703:5701"
+      - "5701:5701"
   management-center:
     image: hazelcast/management-center:5.3.3
     ports:
@@ -28,6 +32,7 @@ services:
     hostname: broker1
     ports:
       - "9091:9091"
+      - "9997:9997"
     environment:
       KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://broker1:19091,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9091
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
@@ -68,3 +73,18 @@ services:
       - ./data/kafka3/data:/var/lib/kafka/data
     depends_on:
       - zookeeper
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8099:8080"
+    depends_on:
+      - zookeeper
+      - broker1
+      - broker2
+      - broker3
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: broker2:19092
+      KAFKA_CLUSTERS_0_METRICS_PORT: 9997
+      DYNAMIC_CONFIG_ENABLED: 'true'

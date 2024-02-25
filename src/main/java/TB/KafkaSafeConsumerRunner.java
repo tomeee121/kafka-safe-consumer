@@ -1,46 +1,23 @@
 package TB;
 
-import TB.listeners.ReadEventProcessedRunnable;
-import TB.config.HazelcastConfugration;
-import TB.config.JsonDeserializer;
 import TB.config.KafkaJsonSerializer;
 import TB.model.Car;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import java.util.Properties;
-import java.util.UUID;
 
+@SpringBootApplication
 public class KafkaSafeConsumerRunner {
-    private static final String TOPIC_NAME = "tb";
     public static void main( String[] args ) throws InterruptedException {
-        HazelcastConfugration.addIListForEventIdCache();
-
-        EventRepo eventRepo = new EventRepo();
-        KafkaConsumer<String, Car> consumer = new KafkaConsumer<String, Car>(getProperties(), new StringDeserializer(), new JsonDeserializer(Car.class));
-        Thread kafka = new Thread(new KafkaSafeConsumerRunnable(TOPIC_NAME, consumer, new OffsetRepository(), eventRepo));
-        kafka.start();
-
-        Thread readEventProcessedRunnable = new Thread(new ReadEventProcessedRunnable(eventRepo));
-        readEventProcessedRunnable.start();
-
-        publishRecords();
+        SpringApplication.run(KafkaSafeConsumerRunner.class, args);
     }
 
-    private static Properties getProperties() {
-        Properties properties = new Properties();
-        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9091");
-        properties.put(ConsumerConfig.GROUP_ID_CONFIG, "group-1");
-        properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-        return properties;
-    }
-
-    private static void publishRecords() throws InterruptedException {
+    public void publishRecordsAfterRebalanceOfDeadBroker() throws InterruptedException {
         final String TOPIC_NAME = "tb";
         final String BOOTSTRAP_SERVERS = "localhost:9091";
 
@@ -63,12 +40,11 @@ public class KafkaSafeConsumerRunner {
 
         //wait for Hazelcast startup
         Thread.sleep(7000);
-        for (int i = 0; i < 200; i++) {
+        for (int i = 400; i < 800; i++) {
             System.out.println("published within loop: " + i);
-            String uuidWithOrderMetadata = UUID.randomUUID().toString().replaceFirst("^[a-zA-Z0-9]{3}", String.format("%03d", i));
-            UUID uuidWithInfoAboutOrderForDebugging = UUID.fromString(uuidWithOrderMetadata);
+            TB.model.UUID uuidAbleToRecap = new TB.model.UUID(Long.valueOf(String.format("%03d", i)));
             ProducerRecord<String, Car> record =
-                    new ProducerRecord<>(TOPIC_NAME, "key", new Car("brand: " + i, "model: " + i, uuidWithInfoAboutOrderForDebugging));
+                    new ProducerRecord<>(TOPIC_NAME, "key", new Car("brand: " + i, "model: " + i, uuidAbleToRecap));
 
             // 4. send data by fire and forget method
             producer.send(record);
