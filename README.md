@@ -11,3 +11,12 @@ At the beginning I run docker-compose for kafka, zookeeper, hazelcast, kafka & h
 Now, after all the ids have been processed by the consumer and saved to the Hazelcast, no matter how many times I start the app no more messages of given set will be processed thanks to the business logic:
 
   ![obraz](https://github.com/tomeee121/kafka-safe-consumer/assets/85828070/8eec8811-120a-4e2d-be98-a9ac6c0772db)
+
+* Now let's test how Kafka offset controlling mechanisms work. First step is to disable "auto.commit" property of producer and mock Hazelcast cache to let app process same messages over and over again. Plus I cleared some logs not connected with this lab and set consumer's props for "fetch.min.bytes/fetchmax.wait.ms.config" for the same purpose (every invocation of poll() method leaves some logs bluring it a little bit)
+* Offset can be controlled manually by sync/async committing while method poll() fetching Kafka records occurs or by listening to rebalnce happening (method onPartitionsRevoked()).
+* To check what offset Kafka is on, easy way we can start app second time and read the logs, or just edit IJ configuration and start next isntance of an app while -- trigger it manually.
+* So without commiting offset while polling/rebalancing Kafka broker does not store cached info about what was already read and what not (offset) -- per topic and partition
+* After restart of an app in a minute:
+* ![obraz](https://github.com/tomeee121/kafka-safe-consumer/assets/85828070/87a0a6d8-3c12-4e50-a600-e99a84400548)
+
+  
